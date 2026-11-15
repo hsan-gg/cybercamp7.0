@@ -1,5 +1,6 @@
 """Recover the lamp's rules, then prove them. Fill the four TODOs.
 Run: python workshop.py --host 127.0.0.1 --port 9003"""
+
 import argparse
 import binascii
 import socket
@@ -10,23 +11,25 @@ from wire import ProtocolError, encode, receive
 HELLO, PING = 0x01, 0x02
 
 # TODO 1 — the two command codes.
-SET_BRIGHTNESS = None
-READ_STATUS = None
+SET_BRIGHTNESS = 0x20
+READ_STATUS = 0x22
 
 
 def encode_level(level):
     # TODO 2 — turn a 0-100 value into one byte.
-    raise NotImplementedError
+    return ((level ^ 0x5A) + 7) & 0xFF
 
 
 def compute_check(nonce, sequence, encoded):
     # TODO 3 — build the 4-byte check (binascii.crc32 over a small buffer).
-    raise NotImplementedError
+    buf = struct.pack("<IHB", nonce, sequence, encoded)
+    return binascii.crc32(buf) & 0xFFFFFFFF
 
 
 def decode_status(payload):
     # TODO 4 — return (brightness, temperature_celsius).
-    raise NotImplementedError
+    brightness, temperature = struct.pack("<BH", payload)
+    return brightness, temperature / 100
 
 
 # ---- supplied plumbing; you should not need to change the rest ----
@@ -36,7 +39,10 @@ class Lamp:
         self.sock = socket.create_connection((host, port), timeout=5)
         reply = self._request(HELLO)
         self.name, self.nonce = reply[:-4], int.from_bytes(reply[-4:], "little")
-        print("Connected to %s (nonce %08x)" % (self.name.decode("ascii", "replace"), self.nonce))
+        print(
+            "Connected to %s (nonce %08x)"
+            % (self.name.decode("ascii", "replace"), self.nonce)
+        )
 
     def close(self):
         self.sock.close()
@@ -48,7 +54,9 @@ class Lamp:
         if reply.sequence != self.sequence:
             raise ProtocolError("Reply identifier mismatch")
         if reply.opcode == 0xFF:
-            raise ProtocolError("Server error: " + reply.payload.decode("utf-8", "replace"))
+            raise ProtocolError(
+                "Server error: " + reply.payload.decode("utf-8", "replace")
+            )
         if reply.opcode != (opcode | 0x80):
             raise ProtocolError("Unexpected reply type %02x" % reply.opcode)
         return reply.payload
@@ -56,7 +64,9 @@ class Lamp:
     def set_brightness(self, level):
         encoded = encode_level(level)
         check = compute_check(self.nonce, (self.sequence + 1) & 0xFFFF, encoded)
-        if self._request(SET_BRIGHTNESS, bytes([encoded]) + struct.pack("<I", check)) != bytes([encoded]):
+        if self._request(
+            SET_BRIGHTNESS, bytes([encoded]) + struct.pack("<I", check)
+        ) != bytes([encoded]):
             raise ProtocolError("SET_BRIGHTNESS did not echo the encoded byte")
 
     def read_status(self):
