@@ -17,9 +17,6 @@ def build_message(command, sequence, payload=b""):
     header = struct.pack("<2sBBHH", b"\xca\xfe", 1, command, sequence, len(payload))
     crc = binascii.crc_hqx(header[2:] + payload, 0xFFFF)
     return header + payload + struct.pack("<H", crc)
-    if len(payload) > 256:
-        raise ValueError("Payload exceeds 256 bytes")
-    raise NotImplementedError("TODO 1: build the message")
 
 
 def run(host, port, pause=input):
@@ -45,7 +42,6 @@ def run(host, port, pause=input):
         # Verify both SET_LED replies equal the requested one-byte value.
         send(SET_LED, 3, b"\x01")
         decode_status(send(STATUS, 4))
-        raise NotImplementedError("TODO 2: turn the LED ON/OFF and verify each STATUS")
 
 
 if __name__ == "__main__":
